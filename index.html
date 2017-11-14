@@ -1,0 +1,190 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>The HTML5 Herald</title>
+  <meta name="AI task" content="AI">
+  <meta name="Wojciehc Pospieszynski" content="AI">
+
+</head>
+
+<body>
+	<div style="position: relative; width: 800px; height: 800px; margin: auto;">
+	<canvas id="myChart" width="800" height="800"></canvas>
+	</div>
+  <script src="./Chart.min.js"></script>
+  <script type="text/javascript">
+  	
+	// training examples - params: X, Y, label(0=blue and 1=red)
+    let blues = [
+	    [2, 2, 0],
+	    [4, 2, 0],
+	    [3, 1, 0],
+	    [6, 2, 0],
+	    [3, 1.5, 0],  
+	    [3, 1.8, 0],
+	    [4, 1.8, 0],
+	    [5.5, 1.7, 0],
+		[5, 1.2, 0],
+		[4, 1.4, 0],
+		[3, 2.4, 0],
+		[3, 2.2, 0],
+		[2.1, 2.5, 0],
+		[5, 1.4, 0],
+    ];
+
+    let reds = [
+	    [6, 3, 1],
+	    [7, 2, 1],
+	    [8, 2.4, 1],
+	    [9, 2.6, 1],
+	    [8, 2.6, 1],
+	    [10, 2.6, 1],
+	    [6, 2, 1],
+	    [8, 3, 1],
+	    [8, 2, 1],
+	    [9, 2, 1],
+	    [8, 1.6, 1],
+	    [8, 2.2, 1],
+	    [9, 2.2, 1],
+	    [9, 1.8, 1],
+	    [10, 2, 1]
+    ];
+
+    let w1 = 0.3;
+    let w2 = 0.1;
+    let bias = 0.5;
+
+    // data with unknown label - probably should be red
+    let unknownLabels = [
+    	[4.5,  1, null],
+    	[6,  1.4, null],
+    	[2.5,  1.2, null],
+    	[2.5,  1.4, null],
+    	[4,  2.2, null],
+    	[8,  1.2, null],
+    	[8,  1.4, null],
+    	[9,  1.6, null],
+    	[9,  2.4, null],
+    	[8,  2.8, null],
+    ]
+
+    let trainingSet = blues.concat(reds);
+
+    let makePrediction = function(x, y) {
+    	let z = w1 * x + w2 * y + bias;
+        let prediction = activationFunction(z);
+        return prediction;
+    }
+
+    let activationFunction = function (x) {
+      return 1/(1+Math.exp(-x));
+    }
+
+    let trainingRoutine =function train() {
+ 
+
+      let learningRate = 0.3;
+      let index = -1;
+
+      for (let generation = 0; generation < 50000; generation++) {
+        index = (++index) % trainingSet.length;
+        let point = trainingSet[index];
+
+        let target = point[2]; // expected output
+
+    	let s = w1 * point[0] + w2 * point[1] + bias;
+        let pred = activationFunction(s);
+
+        let error = 0.5 * ((pred - target) ** 2);
+
+        // now we find the slope of the error w.r.t. each parameter (w1, w2, b)
+        // bring derivative through square function
+        let derror_dpred = 1 * (pred - target) * 1;
+
+        // bring derivative through activationFunction
+        // derivative of activationFunction can be written using more activationFunctions! d/dz activationFunction(z) = activationFunction(z)*(1-activationFunction(z))
+        let dpred_ds = activationFunction(s) * (1-activationFunction(s));
+
+        // I think you forgot these in your slope calculation? 
+        let dz_dw1 = point[0];
+        let dz_dw2 = point[1];
+        let dz_db = 1;
+
+        // now we can get the partial derivatives using the chain rule
+        // notice the pattern? We're bringing how the error changes through each function, first through the square, then through the activationFunction
+        // and finally whatever is multiplying our parameter of interest becomes the last part
+        let derror_dw1 = derror_dpred * dpred_ds * dz_dw1;
+        let derror_dw2 = derror_dpred * dpred_ds * dz_dw2;
+        let derror_db =  derror_dpred * dpred_ds * dz_db;
+
+        // now we update our parameters!
+        w1 -= learningRate * derror_dw1;
+        w2 -= learningRate * derror_dw2;
+        bias -= learningRate * derror_db;
+      }
+    }
+
+    trainingRoutine();
+
+	let blueGuesses= [];
+	let redGuesses= [];
+
+    for(var k = 0; k < unknownLabels.length; k++) {
+    	prediction = Math.round(makePrediction(unknownLabels[k][0], unknownLabels[k][1]))
+		if(prediction === 0) {
+			blueGuesses.push(unknownLabels[k]);
+		} else  {
+			redGuesses.push(unknownLabels[k]);
+		}
+    }
+
+    window.addEventListener('load', function(){
+
+    let ctx = document.getElementById("myChart").getContext('2d');
+	let scatterChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+        datasets: [
+	        {
+	        	pointBackgroundColor: 'red',
+	        	backgroundColor: 'red',
+	            label: 'Red ones',
+	            data: reds.map(function(example){return {x: example[0], y: example[1]}} ),
+	            pointRadius: 7
+	        },
+			{
+	        	pointBackgroundColor: 'blue',
+	        	backgroundColor: 'blue',
+	            label: 'Blue ones',
+	            data: blues.map(function(example){return {x: example[0], y: example[1]}} ),
+	            pointRadius: 7
+	        },
+	        {
+	        	pointBackgroundColor: 'blue',
+	        	backgroundColor: 'orange',
+	    	    pointBorderWidth: 5,
+	        	pointBorderColor: 'orange',
+	            data: blueGuesses.map(function(example){return {x: example[0], y: example[1]}}) ,
+	            pointRadius: 10
+	        },
+	           {
+	        	pointBackgroundColor: 'red',
+	        	backgroundColor: 'orange',
+	    	    pointBorderWidth: 5,
+	        	pointBorderColor: 'orange',
+	            data: redGuesses.map(function(example){return {x: example[0], y: example[1]}}) ,
+	            pointRadius: 10
+	        },
+        	]
+    	},
+	    options: {
+    	}
+	});
+});
+
+  </script>
+</body>
+</html>
